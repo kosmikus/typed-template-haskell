@@ -4,10 +4,11 @@ module Example where
 
 import Language.Haskell.TH
 
-type Syntax a = Q (TExp a)
-
-x :: Syntax Int
+x :: Quote m => Code m Int
 x = [| 2 |]
 
-y :: Syntax Int
+y :: Quote m => Code m Int
 y = [| $(x) + $(x) |]
+
+z :: Quote m => m Exp
+z = [|| 2 ||]

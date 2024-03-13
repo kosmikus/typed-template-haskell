@@ -1,8 +1,8 @@
 module Plugins.TypedTemplateHaskell where
 
 import Generics.SYB
-import HsSyn
-import GhcPlugins
+import GHC.Plugins
+import GHC.Hs
 
 plugin :: Plugin
 plugin =
@@ -12,22 +12,19 @@ plugin =
 parserPlugin ::
      [CommandLineOption]
   -> ModSummary
-  -> HsParsedModule
-  -> Hsc HsParsedModule
-parserPlugin _ _ pm =
-  return (pm { hpm_module = transform (hpm_module pm) })
+  -> ParsedResult
+  -> Hsc ParsedResult
+parserPlugin _ _ pr =
+  return (pr { parsedResultModule = (parsedResultModule pr) { hpm_module = transform (hpm_module (parsedResultModule pr)) } })
 
 -- | Just flips typed and untyped splices and quotes
 transform :: Located (HsModule GhcPs) -> Located (HsModule GhcPs)
 transform =
-  everywhere (mkT goQuote . mkT goSplice)
+  everywhere (mkT go)
   where
-    goSplice :: HsSplice GhcPs -> HsSplice GhcPs
-    goSplice (HsUntypedSplice _ dec id expr) = HsTypedSplice NoExt dec id expr
-    goSplice (HsTypedSplice _ dec id expr) = HsUntypedSplice NoExt dec id expr
-    goSplice x = x
-
-    goQuote :: HsBracket GhcPs -> HsBracket GhcPs
-    goQuote (ExpBr _ expr) = TExpBr NoExt expr
-    goQuote (TExpBr _ expr) = ExpBr NoExt expr
-    goQuote x = x
+    go :: HsExpr GhcPs -> HsExpr GhcPs
+    go (HsUntypedSplice a1 (HsUntypedSpliceExpr a2 expr)) = HsTypedSplice (a1, a2) expr
+    go (HsTypedSplice (a1, a2) expr) = HsUntypedSplice a1 (HsUntypedSpliceExpr a2 expr)
+    go (HsUntypedBracket a1 (ExpBr _a2 expr)) = HsTypedBracket a1 expr
+    go (HsTypedBracket a expr) = HsUntypedBracket a (ExpBr noExtField expr)
+    go x = x
